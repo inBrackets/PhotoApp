@@ -1,0 +1,87 @@
+name: Build and Release JAR
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    env:
+      REPO_NAME: ${{ github.event.repository.name }}
+      TAG_NAME: ${{ github.ref_name }}
+    permissions: write-all
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Extract project name and tag name
+      - name: Extract Project Name and Tag Name
+        id: extract_info
+        run: |
+          echo "repo_name=$REPO_NAME" >> $REPO_NAME
+          echo "tag_name=$TAG_NAME" >> $TAG_NAME
+
+      # Set up JDK 17
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # Set up Node.js for the frontend build
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      # Navigate to the frontend directory and install npm dependencies
+      - name: Install npm dependencies
+        working-directory: src/main/frontend
+        run: npm install
+
+      # Build the React app
+      - name: Build React App
+        working-directory: src/main/frontend
+        run: npm run build
+        env:
+          CI: true
+
+      # Cache Maven dependencies to speed up subsequent builds
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      # Build the Java project with Maven
+      - name: Build with Maven
+        run: mvn clean package -e
+
+      # Create GitHub release for the tag and upload the JAR
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: true
+
+      # Upload the JAR file to the release
+      - name: Upload JAR to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: target/OgniskoMuzyczne-1.0.0-SNAPSHOT.jar
+          asset_name: ${{ env.REPO_NAME }}-${{ env.TAG_NAME }}.jar
+          asset_content_type: application/java-archive
