@@ -43,7 +43,7 @@ const App = () => {
     <Container>
       <Row className="my-4">
         <Col>
-          <h2>Upload Picture</h2>
+          <h2>Yavardu by Bora</h2>
           <Form onSubmit={handlePictureUpload}>
             <Form.Group className="mb-3">
               <Form.Label>Picture Name</Form.Label>
